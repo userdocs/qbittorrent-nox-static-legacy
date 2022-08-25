@@ -1,0 +1,107 @@
+# @credits https://github.com/c0re100/qBittorrent-Enhanced-Edition
+name: matrix multi build and release - customs tags
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os_id: [alpine]
+        os_version_id: [edge]
+        arch_type: [x86_64, armhf, armv7, aarch64]
+        qbittorrent_tag: ["-qt release-4.3.9"]
+
+    name: "${{ matrix.arch_type }}-libtorrent-v1.2"
+
+    env:
+      build_dir: "qbt-build"
+      name: "${{ matrix.arch_type }}-libtorrent-v1.2"
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Host - update
+        run: sudo apt-get update
+
+      - name: Host - upgrade
+        run: sudo apt-get -y upgrade
+
+      - name: Host - Install host qemu-static
+        run: sudo apt-get install -y qemu binfmt-support qemu-user-static
+
+      - name: Host - Docker multiarch bootstrap
+        run: sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+      - name: Host - Create Docker template env file
+        run: |
+          echo "qbt_libtorrent_version=1.2" > env.custom
+          echo "qbt_qt_version=5" >> env.custom
+          echo "qbt_build_tool="qmake" >> env.custom
+          echo "qbt_cross_name=${{ matrix.arch_type }}" >> env.custom
+          echo "qbt_patches_url=userdocs/qbittorrent-nox-static-legacy" >> env.custom
+          echo "qbt_workflow_files=yes" >> env.custom
+          echo "qbt_libtorrent_master_jamfile=no" >> env.custom
+
+      - name: Host - Create docker multiarch container
+        run: docker run --name multiarch -it -d --env-file env.custom -w /root -v ${{ github.workspace }}:/root ${{ matrix.os_id }}:${{ matrix.os_version_id }}
+
+      - name: Docker - apk update
+        run: docker exec -w /root multiarch apk update
+
+      - name: Docker - apk install bash
+        run: docker exec -w /root multiarch apk add bash
+
+      - name: Docker - Bootstrap
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh ${{ matrix.qbittorrent_tag }} -bs-a
+
+      - name: Host - Bootstrap release tag
+        run: echo "release_tag=$(cat ${{ env.build_dir }}/release_info/tag.md)" >> $GITHUB_ENV
+
+      - name: Host - Bootstrap release title
+        run: echo "release_title=$(cat ${{ env.build_dir }}/release_info/title.md)" >> $GITHUB_ENV
+
+      - name: Docker - zlib-ng
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh zlib
+
+      - name: Docker - iconv
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh iconv
+
+      - name: Docker - icu
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh icu
+
+      - name: Docker - openssl
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh openssl
+
+      - name: Docker - boost
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh boost
+
+      - name: Docker - libtorrent
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh libtorrent
+
+      - name: Docker - qtbase -i
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qtbase -i
+
+      - name: Docker - qttools
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qttools
+
+      - name: Docker - qbittorrent
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh ${{ matrix.qbittorrent_tag }} qbittorrent
+
+      - name: Docker - "Set release asset name"
+        run: docker exec -w /root/${{ env.build_dir }}/completed multiarch mv -f qbittorrent-nox ${{ matrix.arch_type }}-qbittorrent-nox
+
+      - name: Host- Create release - tag - assets
+        uses: ncipollo/release-action@v1.10.0
+        with:
+          prerelease: "false"
+          artifacts: "${{ env.build_dir }}/completed/${{ matrix.arch_type }}-qbittorrent-nox,${{ env.build_dir }}/release_info/dependency-version.json"
+          replacesArtifacts: true
+          tag: "${{ env.release_tag }}"
+          name: "${{ env.release_title }}"
+          bodyFile: "${{ env.build_dir }}/release_info/release.md"
+          allowUpdates: true
+          token: "${{ secrets.GITHUB_TOKEN }}"
