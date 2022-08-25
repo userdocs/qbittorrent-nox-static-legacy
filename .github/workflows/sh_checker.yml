@@ -1,0 +1,18 @@
+name: sh-checker
+on:
+  push:
+  pull_request:
+jobs:
+  sh-checker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run the sh-checker
+        uses: luizm/action-sh-checker@v0.5.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHELLCHECK_OPTS: -e SC2034,SC1091 # It is possible to exclude some shellcheck warnings.
+          SHFMT_OPTS: -ci -sr -i 0 # It is possible to pass arguments to shftm
+        with:
+          sh_checker_comment: true
+          sh_checker_exclude: ""
