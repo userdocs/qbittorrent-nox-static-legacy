@@ -40,7 +40,7 @@ jobs:
         run: |
           echo "qbt_libtorrent_version=1.2" > env.custom
           echo "qbt_qt_version=5" >> env.custom
-          echo "qbt_build_tool="qmake" >> env.custom
+          echo "qbt_build_tool=qmake" >> env.custom
           echo "qbt_cross_name=${{ matrix.arch_type }}" >> env.custom
           echo "qbt_patches_url=userdocs/qbittorrent-nox-static-legacy" >> env.custom
           echo "qbt_workflow_files=yes" >> env.custom
