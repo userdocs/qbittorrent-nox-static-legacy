@@ -120,7 +120,6 @@ set_default_values() {
 			[[ "${qbt_build_tool}" == 'cmake' && "${qbt_qt_version}" =~ ^5 ]] && qbt_build_tool="cmake" qbt_qt_version="6"
 			[[ "${qbt_build_tool}" == 'cmake' && "${qbt_qt_version}" =~ ^6 ]] && qbt_use_qt6="ON"
 			;;
-
 	esac
 
 	qbt_python_version="3" # We are only using python3 but it's easier to just change this if we need to.
@@ -559,8 +558,13 @@ set_module_urls() {
 	read -ra qt_version_short_array <<< "${qt_version//\./ }"
 	qt_version_short="${qt_version_short_array[0]/v/}.${qt_version_short_array[1]/v/}"
 
-	qt5_version="$(grep -Em1 "v5" <<< "${qt_github_tag_list}" | sed 's/-lts-lgpl//g')"
-	qt6_version="$(grep -Em1 "v6" <<< "${qt_github_tag_list}")"
+	if [[ "${qbt_qt_version}" =~ ^6 ]]; then
+		qt6_version="$(grep -Em1 "v${qbt_qt_version}" <<< "${qt_github_tag_list}" | sed 's/-lts-lgpl//g')"
+		qt5_version="$(grep -Em1 "v5" <<< "${qt_github_tag_list}" | sed 's/-lts-lgpl//g')"
+	else
+		qt6_version="$(grep -Em1 "v6" <<< "${qt_github_tag_list}")"
+		qt5_version="$(grep -Em1 "v${qbt_qt_version}" <<< "${qt_github_tag_list}" | sed 's/-lts-lgpl//g')"
+	fi
 
 	qtbase_github_tag="${qt_version}"
 	qttools_github_tag="${qt_version}"
@@ -1165,11 +1169,11 @@ _release_info() {
 
 		## Build matrix for libtorrent ${libtorrent_github_tag}
 
-		ℹ️ With Qbittorrent 4.4.0 onwards all cmake builds use Qt6 and all qmake builds use Qt5, until Qt5 is phased out.
+		ℹ️ With Qbittorrent 4.4.0 onwards all cmake builds use Qt6 and all qmake builds use Qt5, as long as Qt5 is supported.
 
 		ℹ️ [Check the build table for more info](https://github.com/userdocs/qbittorrent-nox-static#build-table---dependencies---arch---os---build-tools)
 
-		⚠️ Binary builds are not stripped by default to preserve debugging with gdb.
+		⚠️ Binary builds are stripped - See https://userdocs.github.io/qbittorrent-nox-static/#/debugging
 
 		<!--
 		declare -A current_build_version
@@ -1281,11 +1285,14 @@ _error_tag() {
 _script_version() {
 	script_version_remote="$(curl -sL "${script_url}" | sed -rn 's|^script_version="(.*)"$|\1|p')"
 
-	script_version_test="${script_version#0\.}" script_version_test="${script_version_test//\./}"
-	script_version_test_remote="${script_version_remote#0\.}" script_version_test_remote="${script_version_test_remote//\./}"
+	semantic_version() {
+		local test_array
+		read -ra test_array < <(printf "%s" "${@//./ }")
+		printf "%d%03d%03d%03d" "${test_array[@]}"
+	}
 
-	if [[ ${script_version_test} -lt "${script_version_test_remote}" ]]; then
-		echo -e "${tn} ${tbk}${urc}${bkend} Script update available! Versions - ${cly}local:${clr}${script_version}${cend}  ${cly}remote:${clg}${script_version_remote}${cend}"
+	if [[ "$(semantic_version "${script_version}")" -lt "$(semantic_version "${script_version_remote}")" ]]; then
+		echo -e "${tn} ${tbk}${urc}${bkend} Script update available! Versions - ${cly}local:${clr}${script_version}${cend} ${cly}remote:${clg}${script_version_remote}${cend}"
 		echo -e "${tn} ${ugc} curl -sLo ~/qbittorrent-nox-static.sh https://git.io/qbstatic${cend}"
 	else
 		echo -e "${tn} ${ugc} Script version: ${clg}${script_version}${cend}"
