@@ -99,6 +99,12 @@ set_default_values() {
 	qbt_patches_url="${qbt_patches_url:-userdocs/qbittorrent-nox-static}" # Provide a git username and repo in this format - username/repo - In this repo the structure needs to be like this /patches/libtorrent/1.2.11/patch and/or /patches/qbittorrent/4.3.1/patch and your patch file will be automatically fetched and loadded for those matching tags.
 	qbt_libtorrent_version="${qbt_libtorrent_version:-2.0}"               # Set this here so it is easy to see and change
 	qbt_libtorrent_master_jamfile="${qbt_libtorrent_master_jamfile:-no}"
+	qbt_optimise_strip="${qbt_optimise_strip:-yes}"
+
+	if [[ "${qbt_optimise_strip}" = 'yes' ]]; then
+		qbt_strip_qmake='strip'
+		qbt_strip_flags='-s'
+	fi
 
 	case "${qbt_qt_version}" in
 		5)
@@ -703,7 +709,8 @@ _installation_modules() {
 		echo -e " ${cly}  qbt_cross_name=\"${clg}${qbt_cross_name}${cly}\"${cend}"
 		echo -e " ${cly}  qbt_patches_url=\"${clg}${qbt_patches_url}${cly}\"${cend}"
 		echo -e " ${cly}  qbt_workflow_files=\"${clg}${qbt_workflow_files}${cly}\"${cend}"
-		echo -e " ${cly}  qbt_libtorrent_master_jamfile=\"${clg}${qbt_libtorrent_master_jamfile}${cly}\"${cend}${tn}"
+		echo -e " ${cly}  qbt_libtorrent_master_jamfile=\"${clg}${qbt_libtorrent_master_jamfile}${cly}\"${cend}"
+		echo -e " ${cly}  qbt_optimise_strip=\"${clg}${qbt_optimise_strip}${cly}\"${cend}${tn}"
 		exit
 	fi
 }
