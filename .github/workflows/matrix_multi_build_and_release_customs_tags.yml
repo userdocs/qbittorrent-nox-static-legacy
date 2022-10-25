@@ -78,7 +78,7 @@ jobs:
         run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh boost
 
       - name: Docker - libtorrent
-        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh -lt v1.2.16 libtorrent
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh libtorrent
 
       - name: Docker - qtbase -i
         run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qtbase -i
