@@ -21,7 +21,7 @@ jobs:
       build_dir: "qbt-build"
       name: "${{ matrix.arch_type }}-libtorrent-v1.2"
     outputs:
-      draft_id: ${{ steps.draft_id.outputs.draft_id }}
+      draft_id: ${{ steps.release_id.outputs.id }}
 
     steps:
       - name: Checkout
@@ -98,7 +98,8 @@ jobs:
       - name: Host - Bootstrap release title
         run: echo "release_title=$(cat ${{ env.build_dir }}/release_info/title.md)" >> $GITHUB_ENV
 
-      - name: Host- Create release - tag - assets
+      - name: Host - Create release - tag - assets
+        id: release_id
         uses: ncipollo/release-action@v1.11.1
         with:
           prerelease: "false"
@@ -110,10 +111,6 @@ jobs:
           bodyFile: "${{ env.build_dir }}/release_info/release.md"
           allowUpdates: true
           token: "${{ secrets.GITHUB_TOKEN }}"
-
-      - name: Create draft release id output
-        id: draft_id
-        run: echo "draft_id=${{ steps.release_id.outputs.id }}" >> $GITHUB_OUTPUT
 
   publish_draft:
     name: Publish draft release
