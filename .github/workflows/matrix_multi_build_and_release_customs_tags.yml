@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -20,9 +20,12 @@ jobs:
     env:
       build_dir: "qbt-build"
       name: "${{ matrix.arch_type }}-libtorrent-v1.2"
+    outputs:
+      draft_id: ${{ steps.draft_id.outputs.draft_id }}
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
       - name: Host - update
         run: sudo apt-get update
@@ -59,12 +62,6 @@ jobs:
       - name: Docker - Bootstrap
         run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh ${{ matrix.qbittorrent_tag }} -bs-a
 
-      - name: Host - Bootstrap release tag
-        run: echo "release_tag=$(cat ${{ env.build_dir }}/release_info/tag.md)" >> $GITHUB_ENV
-
-      - name: Host - Bootstrap release title
-        run: echo "release_title=$(cat ${{ env.build_dir }}/release_info/title.md)" >> $GITHUB_ENV
-
       - name: Docker - zlib-ng
         run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh zlib
 
@@ -92,13 +89,20 @@ jobs:
       - name: Docker - qbittorrent
         run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh ${{ matrix.qbittorrent_tag }} qbittorrent
 
-      - name: Docker - "Set release asset name"
+      - name: Docker - Set release asset name
         run: docker exec -w /root/${{ env.build_dir }}/completed multiarch mv -f qbittorrent-nox ${{ matrix.arch_type }}-qbittorrent-nox
+
+      - name: Host - Bootstrap release tag
+        run: echo "release_tag=$(cat ${{ env.build_dir }}/release_info/tag.md)" >> $GITHUB_ENV
+
+      - name: Host - Bootstrap release title
+        run: echo "release_title=$(cat ${{ env.build_dir }}/release_info/title.md)" >> $GITHUB_ENV
 
       - name: Host- Create release - tag - assets
         uses: ncipollo/release-action@v1.11.1
         with:
           prerelease: "false"
+          draft: "true"
           artifacts: "${{ env.build_dir }}/completed/${{ matrix.arch_type }}-qbittorrent-nox,${{ env.build_dir }}/release_info/dependency-version.json"
           replacesArtifacts: true
           tag: "${{ env.release_tag }}"
@@ -106,3 +110,19 @@ jobs:
           bodyFile: "${{ env.build_dir }}/release_info/release.md"
           allowUpdates: true
           token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Create draft release id output
+        id: draft_id
+        run: echo "draft_id=${{ steps.release_id.outputs.id }}" >> $GITHUB_OUTPUT
+
+  publish_draft:
+    name: Publish draft release
+    runs-on: ubuntu-22.04
+    needs: build
+    steps:
+      - name: Update draft to release
+        run: |
+          curl -s \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/releases/${{ needs.build.outputs.draft_id }} -d '{"draft": "false"}'
