@@ -104,6 +104,7 @@ jobs:
         with:
           prerelease: "false"
           draft: "true"
+          commit: ${{ github.ref }}
           artifacts: "${{ env.build_dir }}/completed/${{ matrix.arch_type }}-qbittorrent-nox,${{ env.build_dir }}/release_info/dependency-version.json"
           replacesArtifacts: true
           tag: "${{ env.release_tag }}"
@@ -117,9 +118,8 @@ jobs:
     runs-on: ubuntu-22.04
     needs: build
     steps:
-      - name: Update draft to release
-        run: |
-          curl -s \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/releases/${{ needs.build.outputs.draft_id }} -d '{"draft": "false"}'
+      - uses: eregon/publish-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          release_id: ${{ needs.build.outputs.draft_id }}
