@@ -20,6 +20,7 @@ jobs:
     env:
       build_dir: "qbt-build"
       name: "${{ matrix.arch_type }}-libtorrent-v1.2"
+      draft_status: true
     outputs:
       draft_id: ${{ steps.release_id.outputs.id }}
 
@@ -98,12 +99,20 @@ jobs:
       - name: Host - Bootstrap release title
         run: echo "release_title=$(cat ${{ env.build_dir }}/release_info/title.md)" >> $GITHUB_ENV
 
+      - name: Compare latest release tag to release_tag
+        run: |
+          latest_release_tag="$(curl -s -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name')"
+
+          if [[ "${latest_release_tag}" == "${{ env.release_tag }}" ]]; then
+              echo "draft_status=false" >> $GITHUB_ENV
+          fi
+
       - name: Host - Create release - tag - assets
         id: release_id
         uses: ncipollo/release-action@v1.11.1
         with:
           prerelease: "false"
-          draft: "true"
+          draft: "${{ env.draft_status }}"
           commit: ${{ github.ref }}
           artifacts: "${{ env.build_dir }}/completed/${{ matrix.arch_type }}-qbittorrent-nox,${{ env.build_dir }}/release_info/dependency-version.json"
           replacesArtifacts: true
