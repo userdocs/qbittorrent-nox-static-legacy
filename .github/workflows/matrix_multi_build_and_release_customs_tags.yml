@@ -22,7 +22,9 @@ jobs:
       name: "${{ matrix.arch_type }}-libtorrent-v1.2"
       draft_status: true
     outputs:
-      draft_id: ${{ steps.release_id.outputs.id }}
+      draft_id: "${{ steps.release_id.outputs.id }}"
+      draft_status: "${{ steps.draft_status.outputs.draft_status }}"
+      release_tag: "${{ steps.release_tag.outputs.release_tag }}"
 
     steps:
       - name: Checkout
@@ -50,6 +52,8 @@ jobs:
           echo "qbt_workflow_files=yes" >> env.custom
           echo "qbt_libtorrent_master_jamfile=no" >> env.custom
           echo "qbt_optimise_strip=yes" >> env.custom
+          echo "qbt_revision_url=${{ github.repository }}" >> env.custom
+          echo "qbt_workflow_type=legacy" >> env.custom
 
       - name: Host - Create docker multiarch container
         run: docker run --name multiarch -it -d --env-file env.custom -w /root -v ${{ github.workspace }}:/root ${{ matrix.os_id }}:${{ matrix.os_version_id }}
@@ -94,17 +98,24 @@ jobs:
         run: docker exec -w /root/${{ env.build_dir }}/completed multiarch mv -f qbittorrent-nox ${{ matrix.arch_type }}-qbittorrent-nox
 
       - name: Host - Bootstrap release tag
-        run: echo "release_tag=$(cat ${{ env.build_dir }}/release_info/tag.md)" >> $GITHUB_ENV
+        id: release_tag
+        run: |
+          echo "release_tag=$(cat ${{ env.build_dir }}/release_info/tag.md)" >> $GITHUB_ENV
+          echo "release_tag=$(cat ${{ env.build_dir }}/release_info/tag.md)" >> $GITHUB_OUTPUT
 
       - name: Host - Bootstrap release title
         run: echo "release_title=$(cat ${{ env.build_dir }}/release_info/title.md)" >> $GITHUB_ENV
 
       - name: Compare latest release tag to release_tag
+        id: draft_status
         run: |
           latest_release_tag="$(curl -s -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name')"
 
           if [[ "${latest_release_tag}" == "${{ env.release_tag }}" ]]; then
               echo "draft_status=false" >> $GITHUB_ENV
+              echo "draft_status=false" >> $GITHUB_OUTPUT
+          else
+              echo "draft_status=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Host - Create release - tag - assets
@@ -113,7 +124,7 @@ jobs:
         with:
           prerelease: "false"
           draft: "${{ env.draft_status }}"
-          commit: ${{ github.ref }}
+          commit: "${{ github.ref }}"
           artifacts: "${{ env.build_dir }}/completed/${{ matrix.arch_type }}-qbittorrent-nox,${{ env.build_dir }}/release_info/dependency-version.json"
           replacesArtifacts: true
           tag: "${{ env.release_tag }}"
@@ -123,6 +134,7 @@ jobs:
           token: "${{ secrets.GITHUB_TOKEN }}"
 
   publish_draft:
+    if: needs.build.outputs.draft_status == 'true'
     name: Publish draft release
     runs-on: ubuntu-22.04
     needs: build
@@ -132,3 +144,37 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           release_id: ${{ needs.build.outputs.draft_id }}
+
+  publish_revision:
+    if: needs.build.outputs.draft_status == 'false'
+    name: Publish revision info
+    runs-on: ubuntu-22.04
+    needs: build
+    env:
+      revision_url: "https://github.com/${{ github.repository }}/releases/download/${{ needs.build.outputs.release_tag }}/dependency-version.json"
+    steps:
+      - name: Revision Version
+        run: |
+          until curl -sLf "${{ env.revision_url }}" > remote-dependency-version.json; do
+              echo "waiting for URL."
+              sleep 2
+          done
+
+          cat remote-dependency-version.json
+
+          revision_version="$(jq -r '.revision' remote-dependency-version.json)"
+
+          jq -r ".revision=\"$((revision_version +1 ))\"" remote-dependency-version.json --indent 4 > dependency-version.json
+
+          cat dependency-version.json
+
+      - name: Host - Update release
+        uses: ncipollo/release-action@v1.11.1
+        with:
+          artifacts: "dependency-version.json"
+          replacesArtifacts: true
+          tag: "${{ needs.build.outputs.release_tag }}"
+          allowUpdates: true
+          omitBodyDuringUpdate: true
+          omitNameDuringUpdate: true
+          token: "${{ secrets.GITHUB_TOKEN }}"
