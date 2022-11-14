@@ -1,4 +1,6 @@
-# The `qbittorrent-nox-static-legacy` is a fully static build of qBittorrent 4.3.9 and libtorrent v1.2 built with modern dependencies. Derived from the qbittorrent-nox-static project.
+# qbittorrent-nox-static-legacy
+
+The `qbittorrent-nox-static-legacy` is a fully static build of qBittorrent 4.3.9 and libtorrent v1.2 built with modern dependencies. Derived from the qbittorrent-nox-static project.
 
 ## Install the latest release
 
