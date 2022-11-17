@@ -120,7 +120,7 @@ jobs:
 
       - name: Host - Create release - tag - assets
         id: release_id
-        uses: ncipollo/release-action@v1.11.2
+        uses: ncipollo/release-action@v1
         with:
           prerelease: "false"
           draft: "${{ env.draft_status }}"
@@ -169,7 +169,7 @@ jobs:
           cat dependency-version.json
 
       - name: Host - Update release
-        uses: ncipollo/release-action@v1.11.2
+        uses: ncipollo/release-action@v1
         with:
           artifacts: "dependency-version.json"
           replacesArtifacts: true
