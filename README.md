@@ -62,4 +62,3 @@ To track these revisions you can use this command. All new releases start at a r
 jq -r '.revision' < <(curl -sL "https://github.com/userdocs/qbittorrent-nox-static-legacy/releases/latest/download/dependency-version.json")
 ```
 
-Testing
