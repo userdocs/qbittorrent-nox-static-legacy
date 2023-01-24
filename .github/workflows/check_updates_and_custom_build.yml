@@ -1,4 +1,4 @@
-name: check updates and custom build
+name: check updates and custom buildz
 
 on:
   workflow_dispatch:
