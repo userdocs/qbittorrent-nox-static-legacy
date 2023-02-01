@@ -44,10 +44,10 @@ jobs:
 
       - name: Host - Create Docker template env file
         run: |
-          echo "qbt_libtorrent_version=1.2" > env.custom
-          echo "qbt_qt_version=5" >> env.custom
-          echo "qbt_build_tool=qmake" >> env.custom
+          echo "qbt_build_tool=qmake" > env.custom
           echo "qbt_cross_name=${{ matrix.arch_type }}" >> env.custom
+          echo "qbt_libtorrent_version=1.2" >> env.custom
+          echo "qbt_qt_version=5" >> env.custom
           echo "qbt_patches_url=${{ github.repository }}" >> env.custom
           echo "qbt_workflow_files=yes" >> env.custom
           echo "qbt_libtorrent_master_jamfile=no" >> env.custom
