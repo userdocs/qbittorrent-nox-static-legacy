@@ -10,6 +10,15 @@ The `qbittorrent-nox-static-legacy` is a fully static build of qBittorrent 4.3.9
 
 Or uses these commands for your arch:
 
+### x86
+
+```bash
+mkdir -p ~/bin && source ~/.profile
+wget -qO ~/bin/qbittorrent-nox https://github.com/userdocs/qbittorrent-nox-static-legacy/releases/latest/download/x86-qbittorrent-nox
+chmod 700 ~/bin/qbittorrent-nox
+```
+
+
 ### x86_64
 
 ```bash
