@@ -64,6 +64,7 @@ jobs:
           wait_interval: 60
           propagate_failure: true
           wait_workflow: true
+          client_payload: '{"skip_rerun":false}'
 
   finish_tasks:
     name: Finish tasks
