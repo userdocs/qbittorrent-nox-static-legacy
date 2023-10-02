@@ -84,12 +84,12 @@ if [[ "${what_id}" =~ ^(alpine)$ ]]; then
 fi
 
 ## Check against allowed codenames or if the codename is alpine version greater than 3.10
-if [[ ! "${what_version_codename}" =~ ^(alpine|bullseye|focal|jammy)$ ]] || [[ "${what_version_codename}" =~ ^(alpine)$ && "${what_version_id//\./}" -lt "${alpline_min_version:-3100}" ]]; then
+if [[ ! "${what_version_codename}" =~ ^(alpine|bullseye|bookworm|focal|jammy|mantic)$ ]] || [[ "${what_version_codename}" =~ ^(alpine)$ && "${what_version_id//\./}" -lt "${alpline_min_version:-3100}" ]]; then
 	printf '\n%b\n\n' " ${urc} ${cy} This is not a supported OS. There is no reason to continue.${cend}"
 	printf '%b\n\n' " id: ${td}${cly}${what_id}${cend} codename: ${td}${cly}${what_version_codename}${cend} version: ${td}${clr}${what_version_id}${cend}"
 	printf '%b\n\n' " ${uyc} ${td}These are the supported platforms${cend}"
-	printf '%b\n' " ${clm}Debian${cend} - ${clb}bullseye${cend}"
-	printf '%b\n' " ${clm}Ubuntu${cend} - ${clb}focal${cend} - ${clb}jammy${cend}"
+	printf '%b\n' " ${clm}Debian${cend} - ${clb}bullseye${cend} - ${clb}bookworm${cend}"
+	printf '%b\n' " ${clm}Ubuntu${cend} - ${clb}focal${cend} - ${clb}jammy${cend} - ${clb}mantic${cend}"
 	printf '%b\n\n' " ${clm}Alpine${cend} - ${clb}3.10.0${cend} or greater"
 	exit 1
 fi
@@ -706,8 +706,8 @@ _set_module_urls() {
 	declare -gA github_tag
 	if [[ "${what_id}" =~ ^(debian|ubuntu)$ ]]; then
 		github_tag[cmake_ninja]="$(_git_git ls-remote -q -t --refs "${github_url[cmake_ninja]}" | awk '{sub("refs/tags/", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
-		if [[ "${what_version_codename}" =~ ^(jammy)$ ]]; then
-			github_tag[glibc]="glibc-2.37"
+		if [[ "${what_version_codename}" =~ ^(jammy|mantic|bookworm)$ ]]; then
+			github_tag[glibc]="glibc-2.38"
 		else # "$(_git_git ls-remote -q -t --refs https://sourceware.org/git/glibc.git | awk '/\/tags\/glibc-[0-9]\.[0-9]{2}$/{sub("refs/tags/", "");sub("(.*)(-[^0-9].*)(.*)", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
 			github_tag[glibc]="glibc-2.31"
 		fi
@@ -1469,10 +1469,13 @@ _multi_arch() {
 							qbt_cross_host="riscv64-linux-musl"
 							qbt_zlib_arch="mips64"
 							;;&
-						debian | ubuntu)
-							printf '\n%b\n\n' " ${urc} This arch - ${cly}${qbt_cross_target}${cend} - can only be cross built on and Alpine OS Host"
+						debian)
+							printf '\n%b\n\n' " ${urc} The arch ${cly}${qbt_cross_name}${cend} can only be cross built on and Alpine OS Host"
 							exit 1
 							;;
+						ubuntu)
+							qbt_cross_host="riscv64-linux-gnu"
+							;;&
 						*)
 							bitness="64"
 							cross_arch="riscv64"
