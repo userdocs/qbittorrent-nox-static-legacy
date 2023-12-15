@@ -144,7 +144,7 @@ jobs:
         run: docker exec -w /root/${{ env.qbt_build_dir }}/release_info multiarch bash -c 'mv *.md *.json '/root/${{ env.qbt_build_dir }}/completed''
 
       - name: Host - Upload libtorrent-${{ matrix.arch_type }}-qbittorrent-nox and release info artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: libtorrent-${{ matrix.arch_type }}-qbittorrent-nox
           path: |
