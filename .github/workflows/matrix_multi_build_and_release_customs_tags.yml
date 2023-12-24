@@ -174,13 +174,10 @@ jobs:
 
       - name: Host - Download qbittorrent-nox artifacts
         uses: actions/download-artifact@v4
-
-      - name: Host - artifacts organise for release
-        run: |
-          mkdir -p "releases"
-          for files in libtorrent-*-qbittorrent-nox; do
-              cp -rf ${files}/* "releases/"
-          done
+        with:
+          path: "releases"
+          pattern: libtorrent-*-qbittorrent-nox
+          merge-multiple: true
 
       - name: Host - merge release-info
         run: |
