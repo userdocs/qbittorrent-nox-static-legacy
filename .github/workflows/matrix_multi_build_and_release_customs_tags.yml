@@ -50,12 +50,6 @@ jobs:
 
     env:
       qbt_build_dir: "qbt-build"
-      name: "${{ matrix.arch_type }}-libtorrent-v1.2"
-      draft_status: true
-    outputs:
-      draft_id: "${{ steps.release_id.outputs.id }}"
-      draft_status: "${{ steps.draft_status.outputs.draft_status }}"
-      release_tag: "${{ steps.release_tag.outputs.release_tag }}"
 
     steps:
       - name: Checkout
@@ -217,4 +211,4 @@ jobs:
       - name: Trigger rerun workflow on job failures
         run: |
           inputs_retries="${{ inputs.retries }}"
-          gh workflow run rerun.yml -f run_id=${{ github.run_id }} -f attempts=${{ github.run_attempt }} -f retries=${inputs_retries:-5}
+          gh workflow run rerun.yml -f run_id=${{ github.run_id }} -f attempts=${{ github.run_attempt }} -f retries=${inputs_retries:-1}
