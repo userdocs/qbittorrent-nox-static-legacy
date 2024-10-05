@@ -58,7 +58,7 @@ jobs:
         # qbt_boost_tag: [boost-1.84.0]
         qbt_qbittorrent_tag: ["release-4.3.9"]
         include:
-          - qbt_build_tool: ""
+          - qbt_build_tool: "qmake"
             qbt_qt_version_name: ""
             qbt_qt_version: "5"
             # qbt_qt_tag: "v5.15.11-lts-lgpl"
@@ -97,8 +97,8 @@ jobs:
       - name: Host - Create Docker template env file
         run: |
           printf '%s\n' "qbt_libtorrent_version=${{ matrix.qbt_libtorrent_version }}" > env.custom
-          printf '%s\n' "qbt_qt_version=5" >> env.custom
-          printf '%s\n' "qbt_build_tool=qmake" >> env.custom
+          printf '%s\n' "qbt_qt_version=${{ matrix.qbt_qt_version }}" >> env.custom
+          printf '%s\n' "qbt_build_tool=${{ matrix.qbt_build_tool }}" >> env.custom
           printf '%s\n' "qbt_cross_name=${{ matrix.qbt_cross_name }}" >> env.custom
           printf '%s\n' "qbt_patches_url=${{ github.repository }}" >> env.custom
           printf '%s\n' "qbt_skip_icu=yes" >> env.custom
