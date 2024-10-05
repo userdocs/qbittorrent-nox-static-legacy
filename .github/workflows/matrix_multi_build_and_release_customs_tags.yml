@@ -85,25 +85,20 @@ jobs:
       - name: Host - phased updates
         run: printf '%s\n' 'APT::Get::Always-Include-Phased-Updates "false";' | sudo tee /etc/apt/apt.conf.d/99-phased-updates
 
-      - name: Host - set up lunar repo -t lunar
-        run: |
-          printf '%b\n' 'Package: *\nPin: release n=lunar\nPin-Priority: 50' | sudo tee /etc/apt/preferences
-          printf '%b\n' 'deb http://archive.ubuntu.com/ubuntu/ lunar main universe restricted' | sudo tee /etc/apt/sources.list.d/lunar.list
-
       - name: Host - update
         run: sudo apt-get update
 
       - name: Host - upgrade
         run: sudo apt-get -y upgrade
 
-      - name: Host - set up qemu-user-static binfmt-support from lunar
-        run: sudo apt install -t lunar libpipeline1 qemu-user-static binfmt-support
+      - name: Host - set up qemu-user-static binfmt-support
+        run: sudo apt install libpipeline1 qemu-user-static binfmt-support
 
       - name: Host - Create Docker template env file
         run: |
           printf '%s\n' "qbt_libtorrent_version=${{ matrix.qbt_libtorrent_version }}" > env.custom
           printf '%s\n' "qbt_qt_version=${{ matrix.qbt_qt_version }}" >> env.custom
-          printf '%s\n' "qbt_build_tool=${{ matrix.qbt_build_tool }}" >> env.custom
+          printf '%s\n' "qbt_build_tool=qmake" >> env.custom
           printf '%s\n' "qbt_cross_name=${{ matrix.qbt_cross_name }}" >> env.custom
           printf '%s\n' "qbt_patches_url=${{ github.repository }}" >> env.custom
           printf '%s\n' "qbt_skip_icu=yes" >> env.custom
