@@ -97,7 +97,7 @@ jobs:
       - name: Host - Create Docker template env file
         run: |
           printf '%s\n' "qbt_libtorrent_version=${{ matrix.qbt_libtorrent_version }}" > env.custom
-          printf '%s\n' "qbt_qt_version=${{ matrix.qbt_qt_version }}" >> env.custom
+          printf '%s\n' "qbt_qt_version=5" >> env.custom
           printf '%s\n' "qbt_build_tool=qmake" >> env.custom
           printf '%s\n' "qbt_cross_name=${{ matrix.qbt_cross_name }}" >> env.custom
           printf '%s\n' "qbt_patches_url=${{ github.repository }}" >> env.custom
