@@ -54,7 +54,7 @@ jobs:
             "riscv64",
           ]
         qbt_libtorrent_version: ["1.2"]
-        qbt_build_tool: [""]
+        qbt_build_tool: ["qmake"]
         # qbt_boost_tag: [boost-1.84.0]
         qbt_qbittorrent_tag: ["release-4.3.9"]
         include:
