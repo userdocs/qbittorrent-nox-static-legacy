@@ -17,7 +17,7 @@
 #################################################################################################################################################
 # Script version = Major minor patch
 #################################################################################################################################################
-script_version="2.0.9"
+script_version="2.0.10"
 #################################################################################################################################################
 # Set some script features - https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html
 #################################################################################################################################################
@@ -131,7 +131,7 @@ _set_default_values() {
 	export DEBIAN_FRONTEND="noninteractive" && TZ="Europe/London"
 
 	# The default build configuration is qmake + qt5, qbt_build_tool=cmake or -c will make qt6 and cmake default
-	qbt_build_tool="${qbt_build_tool:-qmake}"
+	qbt_build_tool="${qbt_build_tool:-cmake}"
 
 	# Default to empty to use host native build tools. This way we can build on native arch on a supported OS and skip cross build toolchains
 	qbt_cross_name="${qbt_cross_name:-default}"
@@ -1747,7 +1747,7 @@ _release_info() {
 		>
 		> Qbittorrent v5 won't support qmake (Qt5) builds so Qt6 (cmake) will become default and Qt5 builds will no longer be released.
 		>
-		> Binary builds are stripped - See https://userdocs.github.io/qbittorrent-nox-static/#/debugging
+		> Binary builds are stripped - See https://userdocs.github.io/qbittorrent-nox-static/debugging/
 	RELEASE_INFO
 
 	return
