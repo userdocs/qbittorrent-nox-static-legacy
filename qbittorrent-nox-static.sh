@@ -8,7 +8,9 @@
 #
 # @author - userdocs
 #
-# @contributors IceCodeNew Stanislas boredazfcuk AdvenT. guillaumedsde inochisa
+# @contributors IceCodeNew Stanislas boredazfcuk AdvenT. guillaumedsde inochisa angristan xNihil0 Jercik
+#
+# https://github.com/userdocs/qbittorrent-nox-static/graphs/contributors
 #
 # @credits - https://gist.github.com/notsure2 https://github.com/c0re100/qBittorrent-Enhanced-Edition
 #
@@ -17,7 +19,7 @@
 #################################################################################################################################################
 # Script version = Major minor patch
 #################################################################################################################################################
-script_version="2.0.10"
+script_version="2.0.11"
 #################################################################################################################################################
 # Set some script features - https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html
 #################################################################################################################################################
@@ -811,7 +813,7 @@ _set_module_urls() {
 		elif [[ "${os_version_codename}" =~ ^(bookworm|jammy)$ ]]; then
 			github_tag[glibc]="glibc-2.38"
 		else # "$(_git_git ls-remote -q -t --refs https://sourceware.org/git/glibc.git | awk '/\/tags\/glibc-[0-9]\.[0-9]{2}$/{sub("refs/tags/", "");sub("(.*)(-[^0-9].*)(.*)", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
-			github_tag[glibc]="glibc-2.39"
+			github_tag[glibc]="glibc-2.40"
 		fi
 	else
 		github_tag[ninja]="$(_git_git ls-remote -q -t --refs "${github_url[ninja]}" | awk '/v/{sub("refs/tags/", "");sub("(.*)(-[^0-9].*)(.*)", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
@@ -1580,7 +1582,7 @@ _multi_arch() {
 					case "${qbt_cross_target}" in
 						alpine)
 							qbt_cross_host="riscv64-linux-musl"
-							qbt_zlib_arch="mips64"
+							qbt_zlib_arch="riscv64"
 							;;&
 						debian)
 							printf '\n%b\n\n' " ${unicode_red_circle} The arch ${color_yellow_light}${qbt_cross_name}${color_end} can only be cross built on and Alpine OS Host"
@@ -2413,6 +2415,7 @@ _zlib() {
 			-D CMAKE_PREFIX_PATH="${qbt_install_dir}" \
 			-D BUILD_SHARED_LIBS=OFF \
 			-D ZLIB_COMPAT=ON \
+			-D WITH_GTEST=OFF \
 			-D CMAKE_INSTALL_PREFIX="${qbt_install_dir}" |& _tee -a "${qbt_install_dir}/logs/${app_name}.log"
 		cmake --build build |& _tee -a "${qbt_install_dir}/logs/${app_name}.log"
 		_post_command build
@@ -2469,7 +2472,7 @@ _icu() {
 #######################################################################################################################################################
 # shellcheck disable=SC2317
 _openssl() {
-	"${multi_openssl[@]}" --prefix="${qbt_install_dir}" --libdir="${lib_dir##*/}" --openssldir="/etc/ssl" threads no-shared no-dso no-comp CXXFLAGS="${CXXFLAGS}" CPPFLAGS="${CPPFLAGS}" LDFLAGS="${LDFLAGS}" |& _tee "${qbt_install_dir}/logs/${app_name}.log"
+	"${multi_openssl[@]}" --prefix="${qbt_install_dir}" --libdir="${lib_dir##*/}" --openssldir="/etc/ssl" threads no-shared no-dso no-comp no-docs CXXFLAGS="${CXXFLAGS}" CPPFLAGS="${CPPFLAGS}" LDFLAGS="${LDFLAGS}" |& _tee "${qbt_install_dir}/logs/${app_name}.log"
 	make -j"$(nproc)" |& _tee -a "${qbt_install_dir}/logs/${app_name}.log"
 	_post_command build
 	make install_sw |& _tee -a "${qbt_install_dir}/logs/${app_name}.log"
