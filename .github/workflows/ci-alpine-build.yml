@@ -47,8 +47,10 @@ jobs:
             "riscv64",
           ]
         qbt_libtorrent_version: ["1.2"]
+        qbt_libtorrent_tag: [""]
         qbt_build_tool: ["qmake"]
         qbt_qbittorrent_tag: ["release-4.3.9"]
+        qbt_boost_tag: [""]
         include:
           - qbt_build_tool: "qmake"
             qbt_qt_version_name: ""
@@ -87,10 +89,10 @@ jobs:
           printf '%s\n' "qbt_cross_name=${{ matrix.qbt_cross_name }}" >> env.custom
           printf '%s\n' "qbt_patches_url=${{ github.repository }}" >> env.custom
           printf '%s\n' "qbt_skip_icu=${{ inputs.icu }}" >> env.custom
-          printf '%s\n' "qbt_boost_tag=" >> env.custom
-          printf '%s\n' "qbt_libtorrent_tag=" >> env.custom
+          printf '%s\n' "qbt_boost_tag=${{ matrix.qbt_boost_tag }}" >> env.custom
+          printf '%s\n' "qbt_libtorrent_tag=${{ matrix.qbt_libtorrent_tag }}" >> env.custom
           printf '%s\n' "qbt_qt_tag=" >> env.custom
-          printf '%s\n' "qbt_qbittorrent_tag=" >> env.custom
+          printf '%s\n' "qbt_qbittorrent_tag=${{ matrix.qbt_qbittorrent_tag }}" >> env.custom
           printf '%s\n' "qbt_libtorrent_master_jamfile=" >> env.custom
           printf '%s\n' "qbt_workflow_files=${{ inputs.workflow-files }}" >> env.custom
           printf '%s\n' "qbt_workflow_artifacts=" >> env.custom
