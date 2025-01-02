@@ -14,13 +14,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        qbt_libtorrent_version: ["1.2", "2.0"]
+        # qbt_libtorrent_version: ["1.2", "2.0"]
         include:
           - qbt_libtorrent_version: "1.2"
-            preview_release: true
-
-          - qbt_libtorrent_version: "2.0"
             preview_release: false
+
+          # - qbt_libtorrent_version: "2.0"
+          #   preview_release: false
 
     name: "Publish release libtorrent-v${{ matrix.qbt_libtorrent_version }}"
 
