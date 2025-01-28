@@ -73,7 +73,7 @@ _color_test() {
 		exit
 	else
 		echo "The terminal does not support color output."
-		exit 1
+		exit
 	fi
 }
 [[ "${1}" == "ctest" ]] && _color_test # ./scriptname.sh ctest
@@ -102,14 +102,20 @@ os_version_id="$(get_os_info VERSION_ID)"                                       
 [[ "$(wc -w <<< "${os_version_id//\./ }")" -eq "2" ]] && alpine_min_version="310" # Account for variation in the versioning 3.1 or 3.1.0 to make sure the check works correctly
 [[ "${os_id}" =~ ^(alpine)$ ]] && os_version_codename="alpine"                    # If alpine, set the codename to alpine. We check for min v3.10 later with codenames.
 
+if [[ "${os_id}" =~ ^(debian|ubuntu)$ ]]; then
+	os_arch="$(dpkg --print-architecture)"
+elif [[ "${os_id}" =~ ^(alpine)$ ]]; then
+	os_arch="$(apk info --print-arch)"
+fi
+
 # Check against allowed codenames or if the codename is alpine version greater than 3.10
-if [[ ! "${os_version_codename}" =~ ^(alpine|bullseye|bookworm|focal|jammy|noble)$ ]] || [[ "${os_version_codename}" =~ ^(alpine)$ && "${os_version_id//\./}" -lt "${alpine_min_version:-3100}" ]]; then
+if [[ ! "${os_version_codename}" =~ ^(alpine|bookworm|noble)$ ]] || [[ "${os_version_codename}" =~ ^(alpine)$ && "${os_version_id//\./}" -lt "${alpine_min_version:-3150}" ]]; then
 	printf '\n%b\n\n' " ${unicode_red_circle} ${color_yellow} This is not a supported OS. There is no reason to continue.${color_end}"
 	printf '%b\n\n' " id: ${text_dim}${color_yellow_light}${os_id}${color_end} codename: ${text_dim}${color_yellow_light}${os_version_codename}${color_end} version: ${text_dim}${color_red_light}${os_version_id}${color_end}"
 	printf '%b\n\n' " ${unicode_yellow_circle} ${text_dim}These are the supported platforms${color_end}"
-	printf '%b\n' " ${color_magenta_light}Debian${color_end} - ${color_blue_light}bullseye${color_end} - ${color_blue_light}bookworm${color_end}"
-	printf '%b\n' " ${color_magenta_light}Ubuntu${color_end} - ${color_blue_light}focal${color_end} - ${color_blue_light}jammy${color_end} - ${color_blue_light}noble${color_end}"
-	printf '%b\n\n' " ${color_magenta_light}Alpine${color_end} - ${color_blue_light}3.10.0${color_end} ${text_dim}or greater${color_end}"
+	printf '%b\n' " ${color_magenta_light}Debian${color_end} - ${color_blue_light}bookworm${color_end}"
+	printf '%b\n' " ${color_magenta_light}Ubuntu${color_end} - ${color_blue_light}noble${color_end}"
+	printf '%b\n\n' " ${color_magenta_light}Alpine${color_end} - ${color_blue_light}3.15.0${color_end} ${text_dim}or greater${color_end}"
 	exit
 fi
 #######################################################################################################################################################
@@ -138,6 +144,7 @@ multi_arch_options["mipsel"]="mipsel"
 multi_arch_options["mips64"]="mips64"
 multi_arch_options["mips64el"]="mips64el"
 multi_arch_options["riscv64"]="riscv64"
+multi_arch_options["loongarch64"]="loongarch64"
 #######################################################################################################################################################
 # This function sets some default values we use but whose values can be overridden by certain flags or exported as variables before running the script
 #######################################################################################################################################################
@@ -209,7 +216,7 @@ _set_default_values() {
 	qbt_python_version="3"
 
 	# provide gcc flags for the build - this is not used by default but can be set to provide custom flags for the build.
-	qbt_optimise="${qbt_optimise:-}"
+	qbt_optimise="${qbt_optimise:-no}"
 
 	# The default is 17 but can be manually defined via the env qbt_standard - this will be overridden by the _set_cxx_standard function in specific cases
 	qbt_standard="${qbt_standard:-20}" qbt_cxx_standard="c++${qbt_standard}"
@@ -258,7 +265,7 @@ _set_default_values() {
 		if [[ "${os_id}" =~ ^(debian|ubuntu)$ ]]; then delete+=("glibc"); fi
 		if [[ "${qbt_cross_name}" != "default" ]]; then
 			printf '\n%b\n\n' " ${unicode_red_light_circle} You cannot use the ${color_blue_light}-si${color_end} flag with cross compilation${color_end}"
-			exit 1
+			exit
 		fi
 	fi
 
@@ -405,10 +412,14 @@ _set_cxx_standard() {
 _set_build_cons() {
 	if [[ "$(_qbittorrent_build_cons)" == "yes" && "${qbt_qt_version}" == "5" ]]; then
 		printf '\n%b\n\n' " ${text_blink}${unicode_red_light_circle}${color_end} ${color_yellow}qBittorrent ${color_magenta}${github_tag[qbittorrent]}${color_yellow} does not support ${color_red}Qt5${color_yellow}. Please use ${color_green}Qt6${color_yellow} or a qBittorrent ${color_green}v4${color_yellow} tag.${color_end}"
-		if [[ -d "${release_info_dir}" ]]; then touch "${release_info_dir}/disable-qt5"; fi # qbittorrent v5 transition - workflow specific
-		exit
+		exit_script="yes"
 	elif [[ "$(_qbittorrent_build_cons)" == "yes" && "$(_os_std_cons)" == "no" ]]; then
 		printf '\n%b\n\n' " ${text_blink}${unicode_red_light_circle}${color_end} ${color_yellow}qBittorrent ${color_magenta}${github_tag[qbittorrent]}${color_yellow} does not support less than ${color_red}c++20${color_yellow}. Please use an OS with a more modern compiler for v5${color_end}"
+		exit_script="yes"
+	fi
+
+	if [[ "${exit_script}" == "yes" ]]; then
+		if [[ -n "${GITHUB_REPOSITORY}" ]]; then touch disable-qt5; fi
 		if [[ -d "${release_info_dir}" ]]; then touch "${release_info_dir}/disable-qt5"; fi # qbittorrent v5 transition - workflow specific
 		exit
 	fi
@@ -764,7 +775,7 @@ _debug() {
 _custom_flags() {
 	# Compiler optimization flags (for CFLAGS/CXXFLAGS)
 	qbt_optimization_flags="-O3 -pipe -fdata-sections -ffunction-sections"
-	# Preprocessor only flags
+	# Preprocessor only flags - _FORTIFY_SOURCE=3 has been in the GNU C Library (glibc) since version 2.34
 	qbt_preprocessor_flags="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3 -D_GLIBCXX_ASSERTIONS"
 	# Security flags for compiler
 	qbt_security_flags="-fstack-clash-protection -fstack-protector-strong -fno-plt"
@@ -931,13 +942,7 @@ _set_module_urls() {
 	##########################################################################################################################################################
 	if [[ "${os_id}" =~ ^(debian|ubuntu)$ ]]; then
 		github_tag[cmake_ninja]="$(_git_git ls-remote -q -t --refs "${github_url[cmake_ninja]}" | awk '{sub("refs/tags/", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
-		if [[ "${os_version_codename}" =~ ^(bullseye|focal)$ ]]; then
-			github_tag[glibc]="glibc-2.31"
-		elif [[ "${os_version_codename}" =~ ^(bookworm|jammy)$ ]]; then
-			github_tag[glibc]="glibc-2.38"
-		else # "$(_git_git ls-remote -q -t --refs https://sourceware.org/git/glibc.git | awk '/\/tags\/glibc-[0-9]\.[0-9]{2}$/{sub("refs/tags/", "");sub("(.*)(-[^0-9].*)(.*)", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
-			github_tag[glibc]="glibc-2.40"
-		fi
+		github_tag[glibc]="glibc-2.40"
 	else
 		github_tag[ninja]="$(_git_git ls-remote -q -t --refs "${github_url[ninja]}" | awk '/v/{sub("refs/tags/", "");sub("(.*)(-[^0-9].*)(.*)", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
 	fi
@@ -1436,7 +1441,7 @@ _cmake() {
 
 		if [[ "${os_id}" =~ ^(alpine)$ ]]; then
 			if [[ "$("${qbt_install_dir}/bin/ninja" --version 2> /dev/null | sed 's/\.git//g')" != "${app_version[ninja]}" ]]; then
-				_curl "https://github.com/userdocs/qbt-ninja-build/releases/latest/download/ninja-$(apk info --print-arch)" -o "${qbt_install_dir}/bin/ninja"
+				_curl "https://github.com/userdocs/qbt-ninja-build/releases/latest/download/ninja-${os_arch}" -o "${qbt_install_dir}/bin/ninja"
 				_post_command ninja
 				chmod 700 "${qbt_install_dir}/bin/ninja"
 
@@ -1454,7 +1459,9 @@ _cmake() {
 _multi_arch() {
 	if [[ "${multi_arch_options[${qbt_cross_name:-default}]}" == "${qbt_cross_name}" ]]; then
 		if [[ "${os_id}" =~ ^(alpine|debian|ubuntu)$ ]]; then
-			[[ "${1}" != "bootstrap" ]] && printf '\n%b\n' " ${unicode_green_circle}${color_yellow_light} Using multiarch - arch: ${qbt_cross_name} host: ${os_id} target: ${qbt_cross_target}${color_end}"
+			if [[ "${1}" != "bootstrap" ]]; then
+				printf '\n%b\n' " ${unicode_green_circle}${text_bold} Using multiarch:${color_end} ${color_yellow_light}arch:${color_end} ${color_blue_light}${qbt_cross_name}${color_end} ${color_yellow_light}host:${color_end} ${color_blue_light}${os_arch} ${os_id}${color_end} ${color_yellow_light}target:${color_end} ${color_blue_light}${qbt_cross_name} ${qbt_cross_target}${color_end}"
+			fi
 			case "${qbt_cross_name}" in
 				armel)
 					case "${qbt_cross_target}" in
@@ -1701,8 +1708,8 @@ _multi_arch() {
 							qbt_zlib_arch="riscv64"
 							;;&
 						debian)
-							printf '\n%b\n\n' " ${unicode_red_circle} The arch ${color_yellow_light}${qbt_cross_name}${color_end} can only be cross built on and Alpine OS Host"
-							exit 1
+							printf '\n%b\n\n' " ${unicode_red_circle} The arch ${color_yellow_light}${qbt_cross_name}${color_end} can only be cross built on an Alpine or Ubuntu OS Host"
+							exit
 							;;
 						ubuntu)
 							qbt_cross_host="riscv64-linux-gnu"
@@ -1712,6 +1719,30 @@ _multi_arch() {
 							cross_arch="riscv64"
 							qbt_cross_boost="gcc-riscv64"
 							qbt_cross_openssl="linux64-riscv64"
+							qbt_cross_qtbase="linux-g++-64"
+							;;
+					esac
+					;;
+				loongarch64)
+					case "${qbt_cross_target}" in
+						alpine)
+							if [[ "${qbt_qt_version}" == '6' ]]; then
+								cross_arch="loongarch64"
+								qbt_cross_host="loongarch64-linux-musl"
+								qbt_zlib_arch="loongarch64"
+							else
+								printf '\n%b\n\n' " ${unicode_red_circle} The arch ${color_yellow_light}${qbt_cross_name}${color_end} can only be cross built on and Alpine Host with qt6"
+								exit
+							fi
+							;;&
+						debian | ubuntu)
+							printf '\n%b\n\n' " ${unicode_red_circle} The arch ${color_yellow_light}${qbt_cross_name}${color_end} can only be cross built on and Alpine Host with qt6"
+							exit
+							;;&
+						*)
+							bitness="64"
+							qbt_cross_boost="gcc-loongarch64"
+							qbt_cross_openssl="linux64-loongarch64"
 							qbt_cross_qtbase="linux-g++-64"
 							;;
 					esac
@@ -1731,10 +1762,19 @@ _multi_arch() {
 				rm -f "${qbt_cache_dir:-${qbt_install_dir}}/${qbt_cross_host}.tar.gz"
 			fi
 
+			if [[ $os_arch == "aarch64" ]]; then
+				qbt_mcm_toolchain_prefix="aarch64"
+			elif [[ $os_arch == "x86_64" ]]; then
+				qbt_mcm_toolchain_prefix="x86_64"
+			else
+				printf '\n%b\n' " ${unicode_red_circle} We can only crossbuild from a x86_64 or aarch64 host"
+				exit
+			fi
+
 			if [[ "${qbt_cross_target}" =~ ^(alpine)$ ]]; then
 				if [[ "${1}" == 'bootstrap' || "${qbt_cache_dir_options}" == "bs" || ! -f "${qbt_cache_dir:-${qbt_install_dir}}/${qbt_cross_host}.tar.gz" ]]; then
-					printf '\n%b\n' " ${unicode_blue_light_circle} Downloading ${color_magenta_light}${qbt_cross_host}.tar.gz${color_end} cross tool chain - ${color_cyan_light}https://github.com/userdocs/qbt-musl-cross-make/releases/latest/download/${qbt_cross_host}.tar.xz${color_end}"
-					_curl --create-dirs "https://github.com/userdocs/qbt-musl-cross-make/releases/latest/download/${qbt_cross_host}.tar.xz" -o "${qbt_cache_dir:-${qbt_install_dir}}/${qbt_cross_host}.tar.gz"
+					printf '\n%b\n' " ${unicode_blue_light_circle} Downloading ${color_magenta_light}${qbt_cross_host}.tar.gz${color_end} cross tool chain - ${color_cyan_light}https://github.com/userdocs/qbt-musl-cross-make/releases/latest/download/${qbt_mcm_toolchain_prefix}-${qbt_cross_host}.tar.xz${color_end}"
+					_curl --create-dirs "https://github.com/userdocs/qbt-musl-cross-make/releases/latest/download/${qbt_mcm_toolchain_prefix}-${qbt_cross_host}.tar.xz" -o "${qbt_cache_dir:-${qbt_install_dir}}/${qbt_cross_host}.tar.gz"
 				fi
 
 				if [[ -f "${qbt_install_dir}/.active-toolchain-info" ]]; then
@@ -1773,7 +1813,7 @@ _multi_arch() {
 			return
 		else
 			printf '\n%b\n\n' " ${unicode_red_circle} Multiarch only works with Alpine Linux (native or docker)${color_end}"
-			exit 1
+			exit
 		fi
 	else
 		multi_openssl=("./config") # ${multi_openssl[@]}
@@ -1857,6 +1897,7 @@ _release_info() {
 		[[ "${multi_arch_options[${qbt_cross_name}]}" == mips64 ]] && printf '%s\n' "|   mips64    |    mips64-linux-musl     |   mips64    |                      --with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=64                       |"
 		[[ "${multi_arch_options[${qbt_cross_name}]}" == mips64el ]] && printf '%s\n' "|  mips64el   |   mips64el-linux-musl    |   mips64    |                      --with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=64                       |"
 		[[ "${multi_arch_options[${qbt_cross_name}]}" == riscv64 ]] && printf '%s\n' "|   riscv64   |    riscv64-linux-musl    |   rv64gc    |                                 --with-arch=rv64gc --with-abi=lp64d --enable-autolink-libatomic                                 |"
+		[[ "${multi_arch_options[${qbt_cross_name}]}" == loongarch64 ]] && printf '%s\n' "|   loongarch64   |    loongarch64-linux-musl    |   la64v1.0    |                                --with-arch=la64v1.0 --with-abi=lp64d                                 |"
 		printf '\n'
 	} >> "${release_info_dir}/qt${qt_version_short_array[0]}-${qbt_cross_name}-release.md"
 
@@ -1884,7 +1925,7 @@ while (("${#}")); do
 				shift 2
 			else
 				printf '\n%b\n\n' " ${unicode_red_circle} You must provide a directory path when using ${color_blue_light}-b${color_end}"
-				exit 1
+				exit
 			fi
 			;;
 		-bs-c | --bootstrap-cmake)
@@ -1936,7 +1977,7 @@ while (("${#}")); do
 					printf '%b\n' " ${unicode_blue_light_circle} ${arches}${color_end}"
 				done
 				printf '\n%b\n\n' " ${unicode_green_circle} Example usage:${color_blue_light} -ma aarch64${color_end}"
-				exit 1
+				exit
 			fi
 			;;
 		-p | --proxy)
@@ -1950,8 +1991,12 @@ while (("${#}")); do
 				shift 1
 			else
 				printf '\n%b\n\n' " ${unicode_red_light_circle} You cannot use the ${color_blue_light}-o${color_end} flag with cross compilation"
-				exit 1
+				exit
 			fi
+			;;
+		-q | --qmake)
+			qbt_build_tool="--qmake"
+			shift
 			;;
 		-s | --strip)
 			qbt_optimise_strip="yes"
@@ -1968,7 +2013,7 @@ while (("${#}")); do
 				shift
 			else
 				printf '\n%b\n\n' " ${unicode_red_light_circle} You cannot use the ${color_blue_light}-si${color_end} flag with cross compilation${color_end}"
-				exit 1
+				exit
 			fi
 			;;
 		-sdu | --script-debug-urls)
@@ -2035,7 +2080,7 @@ while (("${#}")); do
 					printf '%b\n' " ${unicode_blue_light_circle} ${arches}${color_end}"
 				done
 				printf '\n%b\n\n' " ${unicode_green_circle} Example usage:${color_blue_light} -ma aarch64${color_end}"
-				exit 1
+				exit
 			fi
 			;;
 		-bs-a | --bootstrap-all)
@@ -2168,7 +2213,7 @@ while (("${#}")); do
 					printf '\n%b\n' " ${unicode_red_circle} Please use a correct qt and build tool combination"
 					printf '\n%b\n' " ${unicode_green_circle} qt5 + qmake ${unicode_green_circle} qt6 + cmake ${unicode_red_circle} qt5 + cmake ${unicode_red_circle} qt6 + qmake"
 					_print_env
-					exit 1
+					exit
 				fi
 				shift 2
 			else
@@ -2198,6 +2243,7 @@ while (("${#}")); do
 			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-o${color_end}     ${text_dim}or${color_end} ${color_blue_light}--optimise${color_end}              ${color_yellow}Help:${color_end} ${color_blue_light}-h-o${color_end}     ${text_dim}or${color_end} ${color_blue_light}--help-optimise${color_end}"
 			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-p${color_end}     ${text_dim}or${color_end} ${color_blue_light}--proxy${color_end}                 ${color_yellow}Help:${color_end} ${color_blue_light}-h-p${color_end}     ${text_dim}or${color_end} ${color_blue_light}--help-proxy${color_end}"
 			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-pr${color_end}    ${text_dim}or${color_end} ${color_blue_light}--patch-repo${color_end}            ${color_yellow}Help:${color_end} ${color_blue_light}-h-pr${color_end}    ${text_dim}or${color_end} ${color_blue_light}--help-patch-repo${color_end}"
+			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-q${color_end}     ${text_dim}or${color_end} ${color_blue_light}--qmake${color_end}                 ${color_yellow}Help:${color_end} ${color_blue_light}-h-q${color_end}     ${text_dim}or${color_end} ${color_blue_light}--help-qmkae${color_end}"
 			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-qm${color_end}    ${text_dim}or${color_end} ${color_blue_light}--qbittorrent-master${color_end}    ${color_yellow}Help:${color_end} ${color_blue_light}-h-qm${color_end}    ${text_dim}or${color_end} ${color_blue_light}--help-qbittorrent-master${color_end}"
 			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-qt${color_end}    ${text_dim}or${color_end} ${color_blue_light}--qbittorrent-tag${color_end}       ${color_yellow}Help:${color_end} ${color_blue_light}-h-qt${color_end}    ${text_dim}or${color_end} ${color_blue_light}--help-qbittorrent-tag${color_end}"
 			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-qtt${color_end}   ${text_dim}or${color_end} ${color_blue_light}--qt-tag${color_end}                ${color_yellow}Help:${color_end} ${color_blue_light}-h-qtt${color_end}   ${text_dim}or${color_end} ${color_blue_light}--help-qtt-tag${color_end}"
@@ -2319,7 +2365,7 @@ while (("${#}")); do
 			printf '\n%b\n' " This flag can change the build process in a few ways."
 			printf '\n%b\n' " ${unicode_yellow_circle} Use cmake to build libtorrent."
 			printf '%b\n' " ${unicode_yellow_circle} Use cmake to build qbittorrent."
-			printf '\n%b\n\n' " ${unicode_yellow_circle} You can use this flag with ICU and qtbase will use ICU instead of iconv."
+			printf '\n%b\n\n' " ${unicode_yellow_circle} This is the default setting for the script."
 			exit
 			;;
 		-h-cd | --help-cache-directory)
@@ -2424,6 +2470,14 @@ while (("${#}")); do
 			printf '\n%b\n\n' " ${unicode_blue_light_circle} ${color_green}Usage example:${color_end} ${color_blue_light}-pr usnerame/repo${color_end}"
 			exit
 			;;
+		-h-q | --help-qmake)
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
+			printf '\n%b\n' " This flag can change the build process in a few ways."
+			printf '\n%b\n' " ${unicode_yellow_circle} Use configure scripts to build apps"
+			printf '%b\n' " ${unicode_yellow_circle} Use qmake to build qtbase, qttools and qbittorrent."
+			printf '\n%b\n\n' " ${unicode_yellow_circle} You can use this flag to build older build combinations that don't use cmake"
+			exit
+			;;
 		-h-qm | --help-qbittorrent-master)
 			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
 			printf '\n%b\n' " Always use the master branch for ${color_green}qBittorrent${color_end}"
@@ -2491,7 +2545,7 @@ while (("${#}")); do
 			;;
 		-*) # unsupported flags
 			printf '\n%b\n\n' " ${unicode_red_circle} Error: Unsupported flag ${color_red_light}${1}${color_end} - use ${color_green_light}-h${color_end} or ${color_green_light}--help${color_end} to see the valid options${color_end}" >&2
-			exit 1
+			exit
 			;;
 		*) # preserve positional arguments
 			params2+=("${1}")
@@ -2807,7 +2861,7 @@ _qtbase() {
 	else
 		printf '\n%b\n' " ${unicode_red_circle} Please use a correct qt and build tool combination"
 		printf '\n%b\n\n' " ${unicode_green_circle} qt5 + qmake ${unicode_green_circle} qt6 + cmake ${unicode_red_circle} qt5 + cmake ${unicode_red_circle} qt6 + qmake"
-		exit 1
+		exit
 	fi
 }
 #######################################################################################################################################################
@@ -2837,7 +2891,7 @@ _qttools() {
 	else
 		printf '\n%b\n' " ${unicode_red_circle} Please use a correct qt and build tool combination"
 		printf '\n%b\n\n' " ${unicode_green_circle} qt5 + qmake ${unicode_green_circle} qt6 + cmake ${unicode_red_circle} qt5 + cmake ${unicode_red_circle} qt6 + qmake"
-		exit 1
+		exit
 	fi
 }
 #######################################################################################################################################################
