@@ -10,7 +10,7 @@ concurrency:
 
 jobs:
   sh-checker:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
     steps:
@@ -21,7 +21,7 @@ jobs:
       - name: Run the sh-checker
         uses: luizm/action-sh-checker@v0.9.0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           SHELLCHECK_OPTS: -e SC2034,SC1091 # It is possible to exclude some shellcheck warnings.
           SHFMT_OPTS: -ci -sr -i 0 # It is possible to pass arguments to shftm
         with:
@@ -29,7 +29,7 @@ jobs:
           sh_checker_exclude: ""
 
   zizmor-checker:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
     steps:
@@ -54,7 +54,7 @@ jobs:
           exit "$exit_code"
 
   editorconfig-checker:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
     steps:
