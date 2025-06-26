@@ -8,7 +8,7 @@
 #
 # @author - userdocs
 #
-# @contributors IceCodeNew Stanislas boredazfcuk AdvenT. guillaumedsde inochisa angristan xNihil0 Jercik
+# @contributors IceCodeNew Stanislas boredazfcuk AdvenT. guillaumedsde inochisa angristan xNihil0 Jercik voidtao
 #
 # https://github.com/userdocs/qbittorrent-nox-static/graphs/contributors
 #
@@ -19,7 +19,7 @@
 #################################################################################################################################################
 # Script version = Major minor patch
 #################################################################################################################################################
-script_version="2.0.15"
+script_version="2.0.18"
 #################################################################################################################################################
 # Set some script features - https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html
 #################################################################################################################################################
@@ -176,6 +176,9 @@ _set_default_values() {
 	# In this repo the structure needs to be like this /patches/libtorrent/1.2.11/patch and/or /patches/qbittorrent/4.3.1/patch
 	# your patch file will be automatically fetched and loaded for those matching tags.
 	qbt_patches_url="${qbt_patches_url:-userdocs/qbittorrent-nox-static}"
+
+	# testing = easy way to switch to test qbt-musl-cross-make-test builds via an env in the workflow.
+	qbt_mcm_url="${qbt_mcm_url:-userdocs/qbt-musl-cross-make}"
 
 	# Default to this version of libtorrent is no tag or branch is specified. qbt_libtorrent_version=1.2 or -lt v1.2.18
 	qbt_libtorrent_version="${qbt_libtorrent_version:-2.0}"
@@ -435,6 +438,7 @@ _print_env() {
 	printf '%b\n' " ${color_yellow_light}  qbt_build_tool=\"${color_green_light}${qbt_build_tool}${color_yellow_light}\"${color_end}"
 	printf '%b\n' " ${color_yellow_light}  qbt_cross_name=\"${color_green_light}${qbt_cross_name}${color_yellow_light}\"${color_end}"
 	printf '%b\n' " ${color_yellow_light}  qbt_patches_url=\"${color_green_light}${qbt_patches_url}${color_yellow_light}\"${color_end}"
+	printf '%b\n' " ${color_yellow_light}  qbt_mcm_url=\"${color_green_light}${qbt_mcm_url}${color_yellow_light}\"${color_end}"
 	printf '%b\n' " ${color_yellow_light}  qbt_skip_icu=\"${color_green_light}${qbt_skip_icu}${color_yellow_light}\"${color_end}"
 	printf '%b\n' " ${color_yellow_light}  qbt_boost_tag=\"${color_green_light}${github_tag[boost]}${color_yellow_light}\"${color_end}"
 	printf '%b\n' " ${color_yellow_light}  qbt_libtorrent_tag=\"${color_green_light}${github_tag[libtorrent]}${color_yellow_light}\"${color_end}"
@@ -771,18 +775,35 @@ _debug() {
 #######################################################################################################################################################
 # This function sets some compiler flags globally - b2 settings are set in the ~/user-config.jam  set in the _installation_modules function
 #######################################################################################################################################################
-# Define common flag sets
+# Define common flag sets - hardening is prioritized over performance.
+# https://best.openssf.org/Compiler-Hardening-Guides/Compiler-Options-Hardening-Guide-for-C-and-C++.html#tldr-what-compiler-options-should-i-use
 _custom_flags() {
 	# Compiler optimization flags (for CFLAGS/CXXFLAGS)
 	qbt_optimization_flags="-O3 -pipe -fdata-sections -ffunction-sections"
 	# Preprocessor only flags - _FORTIFY_SOURCE=3 has been in the GNU C Library (glibc) since version 2.34
 	qbt_preprocessor_flags="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3 -D_GLIBCXX_ASSERTIONS"
 	# Security flags for compiler
-	qbt_security_flags="-fstack-clash-protection -fstack-protector-strong -fno-plt"
+	qbt_security_flags="-fstack-clash-protection -fstack-protector-strong -fno-plt -fno-delete-null-pointer-checks -fno-strict-overflow -fno-strict-aliasing -ftrivial-auto-var-init=zero -fexceptions"
 	# Warning control
-	qbt_warning_flags="-w -Wno-error -Wno-error=attributes -Wno-attributes -Wno-psabi"
+	qbt_warning_flags="-w"
 	# Linker specific flags
-	qbt_linker_flags="-Wl,-O1,--as-needed,--sort-common,-z,now,-z,pack-relative-relocs,-z,relro,-z,max-page-size=65536"
+	qbt_linker_flags="-Wl,-O1,--as-needed,--sort-common,-z,nodlopen,-z,noexecstack,-z,now,-z,pack-relative-relocs,-z,relro,-z,max-page-size=65536,--no-copy-dt-needed-entries"
+
+	gcc_version="$(gcc -dumpversion | cut -d. -f1)"
+
+	if [[ "${gcc_version}" -ge 13 ]]; then
+		qbt_security_flags+=" -fstrict-flex-arrays=3"
+	fi
+
+	if [[ "${os_arch}" =~ ^(amd64|x86_64)$ && "${qbt_cross_name}" = "default" ]]; then
+		qbt_security_flags+=" -fcf-protection=full"
+	fi
+
+	if [[ ! "${os_version_codename}" =~ ^(bookworm)$ ]]; then
+		if [[ "${os_arch}" =~ ^(arm64|aarch64)$ && "${qbt_cross_name}" = "default" ]]; then
+			qbt_security_flags+=" -mbranch-protection=standard"
+		fi
+	fi
 
 	if [[ "${os_id}" =~ ^(alpine)$ ]] && [[ -z "${qbt_cross_name}" || "${qbt_cross_name}" == "default" ]]; then
 		if [[ ! "${app_name}" =~ ^(openssl)$ ]]; then
@@ -809,7 +830,7 @@ _custom_flags() {
 	if [[ "${qbt_static_ish}" == "yes" || "${app_name}" =~ ^(glibc|icu)$ ]]; then
 		qbt_static_flags=""
 	else
-		qbt_static_flags="-static-libstdc++ -static-libgcc -static"
+		qbt_static_flags="-static -static-libgcc -static-libstdc++"
 	fi
 
 	# If you set and export your own flags in the env that the script is run, they will be appended to the defaults
@@ -986,7 +1007,7 @@ _set_module_urls() {
 		source_archive_url[glibc]="https://ftpmirror.gnu.org/gnu/libc/${github_tag[glibc]}.tar.xz"
 	fi
 	source_archive_url[zlib]="https://github.com/zlib-ng/zlib-ng/archive/refs/heads/develop.tar.gz"
-	source_archive_url[iconv]="https://mirrors.dotsrc.org/gnu/libiconv/$(grep -Eo 'libiconv-([0-9]{1,3}[.]?)([0-9]{1,3}[.]?)([0-9]{1,3}?)\.tar.gz' <(_curl https://mirrors.dotsrc.org/gnu/libiconv/) | sort -V | tail -1)"
+	source_archive_url[iconv]="https://ftpmirror.gnu.org/gnu/libiconv/$(grep -Eo 'libiconv-([0-9]{1,3}[.]?)([0-9]{1,3}[.]?)([0-9]{1,3}?)\.tar.gz' <(_curl https://ftpmirror.gnu.org/gnu/libiconv/) | sort -V | tail -1)"
 	source_archive_url[icu]="https://github.com/unicode-org/icu/releases/download/${github_tag[icu]}/icu4c-${app_version[icu]/-/_}-src.tgz"
 	source_archive_url[double_conversion]="https://github.com/google/double-conversion/archive/refs/tags/${github_tag[double_conversion]}.tar.gz"
 	source_archive_url[openssl]="https://github.com/openssl/openssl/releases/download/${github_tag[openssl]}/${github_tag[openssl]}.tar.gz"
@@ -1758,8 +1779,8 @@ _multi_arch() {
 
 			if [[ "${qbt_cross_target}" =~ ^(alpine)$ ]]; then
 				if [[ "${1}" == 'bootstrap' || "${qbt_cache_dir_options}" == "bs" || ! -f "${qbt_cache_dir:-${qbt_install_dir}}/${qbt_cross_host}.tar.gz" ]]; then
-					printf '\n%b\n' " ${unicode_blue_light_circle} Downloading ${color_magenta_light}${qbt_cross_host}.tar.gz${color_end} cross tool chain - ${color_cyan_light}https://github.com/userdocs/qbt-musl-cross-make/releases/latest/download/${qbt_mcm_toolchain_prefix}-${qbt_cross_host}.tar.xz${color_end}"
-					_curl --create-dirs "https://github.com/userdocs/qbt-musl-cross-make/releases/latest/download/${qbt_mcm_toolchain_prefix}-${qbt_cross_host}.tar.xz" -o "${qbt_cache_dir:-${qbt_install_dir}}/${qbt_cross_host}.tar.gz"
+					printf '\n%b\n' " ${unicode_blue_light_circle} Downloading ${color_magenta_light}${qbt_cross_host}.tar.gz${color_end} cross tool chain - ${color_cyan_light}https://github.com/${qbt_mcm_url}/releases/latest/download/${qbt_mcm_toolchain_prefix}-${qbt_cross_host}.tar.xz${color_end}"
+					_curl --create-dirs "https://github.com/${qbt_mcm_url}/releases/latest/download/${qbt_mcm_toolchain_prefix}-${qbt_cross_host}.tar.xz" -o "${qbt_cache_dir:-${qbt_install_dir}}/${qbt_cross_host}.tar.gz"
 				fi
 
 				if [[ -f "${qbt_install_dir}/.active-toolchain-info" ]]; then
@@ -2558,8 +2579,11 @@ _installation_modules "${@}" # requires shifted params from options block 2
 # If any modules fail the qbt_modules_test then exit now.
 #######################################################################################################################################################
 if [[ "${qbt_modules_test}" == 'fail' || "${#}" -eq '0' ]]; then
-	printf '\n%b\n' " ${text_blink}${unicode_red_circle}${color_end}${text_bold} One or more of the provided modules are not supported${color_end}"
-	printf '\n%b\n' " ${unicode_yellow_circle}${text_bold} Below is a list of supported modules${color_end}"
+	if [[ "${qbt_modules_test}" == 'fail' ]]; then
+		printf '\n%b\n' " ${text_blink}${unicode_red_circle}${color_end}${text_bold} One or more of the provided modules are not supported${color_end}"
+	fi
+
+	printf '\n%b\n' " ${unicode_yellow_circle}${text_bold} Below is a list of supported modules:${color_end}"
 	printf '\n%b\n' " ${unicode_magenta_circle}${color_magenta_light} ${qbt_modules_install_processed[*]}${color_end}"
 	_print_env
 	exit
@@ -2576,7 +2600,7 @@ _glibc_bootstrap() {
 }
 # shellcheck disable=SC2317
 _glibc() {
-	"${qbt_dl_folder_path}/configure" "${multi_glibc[@]}" --prefix="${qbt_install_dir}" --enable-static-nss --disable-nscd --srcdir="${qbt_dl_folder_path}" |& _tee "${qbt_install_dir}/logs/${app_name}.log"
+	"${qbt_dl_folder_path}/configure" "${multi_glibc[@]}" --prefix="${qbt_install_dir}" --enable-cet --enable-static-nss --disable-nscd --srcdir="${qbt_dl_folder_path}" |& _tee "${qbt_install_dir}/logs/${app_name}.log"
 	make -j"$(nproc)" |& _tee -a "${qbt_install_dir}/logs/$app_name.log"
 	_post_command build
 	make install |& _tee -a "${qbt_install_dir}/logs/${app_name}.log"
