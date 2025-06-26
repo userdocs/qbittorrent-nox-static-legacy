@@ -141,6 +141,10 @@ jobs:
           # Allow the user gh to run sudo without password prompt: docker exec -u gh:gh ${container_name} sudo ls
           docker exec ${container_name} sh -c 'printf "%s" "gh ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/gh'
 
+      - name: Host - patches ${{ inputs.distinct_id }}
+        if: env.disable_qt5 != 'yes'
+        run: mkdir -p ${qbt_build_dir}/patches && cp -r patches/* ${qbt_build_dir}/patches/
+
       - name: Docker - apk update ${{ inputs.distinct_id }}
         if: env.disable_qt5 != 'yes'
         run: docker exec ${container_name} apk update
