@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # qbt_libtorrent_version: ["1.2", "2.0"]
+        qbt_libtorrent_version: ["1.2"]
         include:
           - qbt_libtorrent_version: "1.2"
             preview_release: false
