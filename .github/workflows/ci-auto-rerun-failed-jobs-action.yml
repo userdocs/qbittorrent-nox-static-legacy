@@ -31,11 +31,11 @@ jobs:
       GH_TOKEN: "${{ secrets.AUTO_RERUN || github.token }}"
     steps:
       - name: Host - Checkout action ${{ inputs.distinct_id }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
 
-      - uses: userdocs/gh-cli-workflow-reruns/actions/auto-rerun-failed@main
+      - uses: userdocs/gh-cli-workflow-reruns/actions/auto-rerun-failed@8b29e17f62858eb6f1729c03126a41b0248ac3e3 #v1.0.0
         with:
           run_id: ${{ inputs.run_id }}
           attempts: ${{ inputs.attempts }}
