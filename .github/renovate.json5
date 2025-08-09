@@ -1,53 +1,7 @@
-// https://docs.renovatebot.com/configuration-options/ - using .github/renovate.json5
-// https://docs.renovatebot.com/presets-config/#configbest-practices
-// https://docs.renovatebot.com/presets-config/#configrecommended
+// https://docs.renovatebot.com/config-presets/#github-hosted-presets
+// https://docs.renovatebot.com/config-presets/#github
 {
-  '$schema': 'https://docs.renovatebot.com/renovate-schema.json',
-  'schedule': [
-    "every weekday"
-  ],
   'extends': [
-    'config:recommended',
-    'docker:pinDigests',
-    'helpers:pinGitHubActionDigests',
-    'helpers:pinGitHubActionDigestsToSemver',
-    ':semanticPrefixFixDepsChoreOthers',
-    ':configMigration',
-    ':pinDevDependencies',
-    'abandonments:recommended',
-    ':disableDependencyDashboard',
-    ':ignoreModulesAndTests',
-    'workarounds:all'
-  ],
-  'packageRules': [
-    {
-      'matchDepTypes': [
-        "action"
-      ],
-      'pinDigests': true,
-      'separateMajorMinor': false
-    },
-    {
-      'extends': [
-        "helpers:pinGitHubActionDigests"
-      ],
-      'extractVersion': '^(?<version>v?\\d+\\.\\d+\\.\\d+)$',
-      'versioning': "regex:^v?(?<major>\\d+)(\\.(?<minor>\\d+)\\.(?<patch>\\d+))?$"
-    },
-    {
-      'matchPackageNames': [
-        "**"
-      ],
-      'rangeStrategy': "replace"
-    },
-    {
-      'matchManagers': [
-        "npm"
-      ],
-      'matchFileNames': [
-        "docs/**"
-      ],
-      'enabled': false
-    }
+    'github>userdocs/renovate:default.json5'
   ]
 }
