@@ -39,47 +39,46 @@ jobs:
           curl -sLo- "https://github.com/jgm/pandoc/releases/latest/download/pandoc-${pandoc_git_tag}-linux-$(dpkg --print-architecture).tar.gz" | tar xzf - --strip-components 2 -C "$(pwd)" --exclude="share"
 
       - name: Host - Download 1.2 qbittorrent-nox artifacts ${{ inputs.distinct_id }}
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           path: "1.2"
           pattern: libtorrent-v1.2-*-qbittorrent-nox
           merge-multiple: true
 
       - name: Host - Download 2.0 qbittorrent-nox artifacts ${{ inputs.distinct_id }}
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           path: "2.0"
           pattern: libtorrent-v2.0-*-qbittorrent-nox
           merge-multiple: true
 
       - name: Host - merge release-info ${{ inputs.distinct_id }}
+        env:
+          lt_version: ${{ matrix.qbt_libtorrent_version }}
         run: |
-          if [[ ${{ matrix.qbt_libtorrent_version }} == "1.2" ]]; then
-            for release in 1\.2/*-release.md; do
-              [[ -f "${release}" ]] && release+=("${release}")
-            done
-            revision="$(jq -r .revision 1\.2/*-dependency-version.json | head -n1)"
-            boost="$(jq -r .boost 1\.2/*-dependency-version.json | head -n1)"
-          fi
+          shopt -s nullglob
 
-          if [[ ${{ matrix.qbt_libtorrent_version }} == "2.0" ]]; then
-            for release in 2\.0/*-release.md; do
-              [[ -f "${release}" ]] && release+=("${release}")
-            done
-            revision="$(jq -r .revision 2\.0/*-dependency-version.json | head -n1)"
-            boost="$(jq -r .boost 2\.0/*-dependency-version.json | head -n1)"
-          fi
+          revision="$(jq -r .revision "${lt_version}"/*-dependency-version.json | sort -nr | head -n1)"
+          boost="$(jq -r .boost "${lt_version}"/*-dependency-version.json | head -n1)"
 
-          readarray -t release_sorted < <(printf '%s\n' "${release[@]}" | sort)
-
-          for dependency_version_files in 1\.2/*-dependency-version.json 2\.0/*-dependency-version.json; do
-            if [[ -f "${dependency_version_files}" ]]; then
-                sed -r 's/"boost": (.*)/BOOST_PLACEHOLDER/g' -i "${dependency_version_files}"
-                sed -r 's/"revision": (.*)/REVISION_PLACEHOLDER/g' -i "${dependency_version_files}"
-                dependency_version+=("${dependency_version_files}")
+          # this need to check both 1.2 and 2.0 folders to merge the libtorrent versions in the dependency-version.json
+          for dependency_version_json in {1.2,2.0}/*-dependency-version.json; do
+            if [[ -f ${dependency_version_json} ]]; then
+              sed -r 's/"boost": (.*)/BOOST_PLACEHOLDER/g' -i "${dependency_version_json}"
+              sed -r 's/"revision": (.*)/REVISION_PLACEHOLDER/g' -i "${dependency_version_json}"
+              dependency_version+=("${dependency_version_json}")
             fi
           done
 
+          # This file only needs to merge info specific to the libtorrent matrix running it.
+          for release_md in "${lt_version}"/*-release.md; do
+            if [[ -f ${release_md} ]]; then
+              sed -r 's/^\|(.*)revision(.*)\|(.*)\|$/REVISION_PLACEHOLDER/g' -i "${release_md}"
+              release_md+=("${release_md}")
+            fi
+          done
+
+          readarray -t release_sorted < <(printf '%s\n' "${release_md[@]}" | sort)
           readarray -t dependency_version_sorted < <(printf '%s\n' "${dependency_version[@]}" | sort)
 
           paste -d '\n' "${release_sorted[@]}" | uniq | awk '!(NF && seen[$0]++) || /^>/' > "tmp-release.md"
@@ -87,6 +86,7 @@ jobs:
 
           sed -i "s|BOOST_PLACEHOLDER|\"boost\": \"${boost}\",|" dependency-version.json
           sed -i "s|REVISION_PLACEHOLDER|\"revision\": \"${revision}\"|" dependency-version.json
+          sed -i "s/REVISION_PLACEHOLDER/| revision |${revision} |/" tmp-release.md
 
           ./pandoc --wrap=preserve -f gfm tmp-release.md -t gfm -o release.md
 
