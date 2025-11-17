@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout ${{ inputs.distinct_id }}
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           persist-credentials: false
 
@@ -39,14 +39,14 @@ jobs:
           curl -sLo- "https://github.com/jgm/pandoc/releases/latest/download/pandoc-${pandoc_git_tag}-linux-$(dpkg --print-architecture).tar.gz" | tar xzf - --strip-components 2 -C "$(pwd)" --exclude="share"
 
       - name: Host - Download 1.2 qbittorrent-nox artifacts ${{ inputs.distinct_id }}
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           path: "1.2"
           pattern: libtorrent-v1.2-*-qbittorrent-nox
           merge-multiple: true
 
       - name: Host - Download 2.0 qbittorrent-nox artifacts ${{ inputs.distinct_id }}
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           path: "2.0"
           pattern: libtorrent-v2.0-*-qbittorrent-nox
