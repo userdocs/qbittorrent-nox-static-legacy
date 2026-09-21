@@ -1,0 +1,88 @@
+name: check updates and custom build
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 3 * * 1'
+
+jobs:
+  merge_upstream_repo:
+    name: Sync fork with the upstream repository
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          _response="$(curl -sSw "\n%{http_code}\n" -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -d '{"branch":"main"}' https://api.github.com/repos/${{ github.repository }}/merge-upstream)"
+          rc_http="$(echo "$_response" | tail -n 1)"
+          if [ "$rc_http" != "200" ]; then
+            m_http="$(echo "$_response" | head -n -1 | jq -r '.message')"
+            echo "::error::$m_http"
+            exit 1
+          fi
+
+  check_required_build:
+    name: Check required build
+    needs: merge_upstream_repo
+    runs-on: ubuntu-latest
+    outputs:
+      required_build: ${{ steps.required_build.outputs.required_build }}
+    steps:
+      - id: required_build
+        run: |
+          upstream_dependency_versions="$(curl -sL "https://github.com/userdocs/qbittorrent-nox-static-legacy/releases/latest/download/dependency-version.json")"
+          saved_dependency_versions="$(curl -sL "https://github.com/${{ github.repository }}/releases/latest/download/upstream-dependency-version.json")"
+          if [ -z "$upstream_dependency_versions" ]; then
+            echo "::error::Upstream dependency version file (not found!)"
+            exit 1
+          elif ! echo "$upstream_dependency_versions" | jq &> /dev/null; then
+            echo "::error::Upstream dependency version file (invalid json!)"
+            exit 1
+          elif ! diff <(echo "$upstream_dependency_versions" | sort) <(echo "$saved_dependency_versions" | sort) &>/dev/null; then
+            echo "required_build=true" >> $GITHUB_OUTPUT
+            echo "::notice::Dependency version files mismatch. Required build."
+          else
+            echo "required_build=false" >> $GITHUB_OUTPUT
+          fi
+  trigger_build:
+    name: Trigger build
+    needs: check_required_build
+    if: needs.check_required_build.outputs.required_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Get repository name
+        run: echo "OWN_REPO_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+
+      - name: Trigger workflow build and wait
+        uses: convictional/trigger-workflow-and-wait@v1.6.5
+        with:
+          owner: "${{ github.repository_owner }}"
+          repo: "${{ env.OWN_REPO_NAME }}"
+          github_token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          workflow_file_name: matrix_multi_build_and_release_customs_tags.yml
+          wait_interval: 60
+          propagate_failure: true
+          wait_workflow: true
+          client_payload: '{"skip_rerun":false}'
+
+  finish_tasks:
+    name: Finish tasks
+    needs: trigger_build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Get upstream dependency file and latest version tag
+        id: latest_release_tag
+        run: |
+          curl -sL "https://github.com/userdocs/qbittorrent-nox-static-legacy/releases/latest/download/dependency-version.json" > upstream-dependency-version.json
+          latest_release_tag="$(curl -s -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name')"
+          echo "latest_release_tag=$latest_release_tag" >> $GITHUB_OUTPUT
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: "${{ steps.latest_release_tag.outputs.latest_release_tag }}"
+          asset_name: upstream-dependency-version.json
+          file: upstream-dependency-version.json
+          overwrite: true
